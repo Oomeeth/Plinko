@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+
+<html>
+
+    <head>
+        <script src="https://pixijs.download/release/pixi.js"></script>
+        <script src="js/GridConstruction.js"></script>
+        <script src="js/Pathfinding.js"></script>
+        <script src="js/Debugging.js"></script>
+        <script src="js/LoadSprites.js"></script>
+        <script src="js/DrawShapes.js"></script>
+        <script src="js/BettingUI.js"></script>
+        <script src="js/Betting.js"></script>
+        <script src="js/Settings.js"></script>
+    </head>
+
+    <body style="margin: 0; padding: 0;">
+        <script type="module">
+
+            //USER DEFINED VARIABLES - START
+            let showNeighbors = false;
+            let debugPathConstruction = false;
+            let balance = 1000;
+            let debitAmount = 10;
+            let musicVolume = 0.01;
+            var musicSrc = 'sounds/music.mp3';
+            //USER DEFINED VARIABLES - END
+
+            let pathNodes = [];
+            let ballSize = 15;
+            //Ensures peg size is slightly smaller than ball
+            let pegSize = ballSize / 1.4;
+
+            //Initializes PixiJS
+            var app = new PIXI.Application();
+            await app.init({ width: window.innerWidth, height: window.innerHeight + 350 });
+            document.body.appendChild(app.canvas);
+
+            //Loads background image into stage
+            await LoadBackground(app);
+
+            //Grid construction for pegs
+            var nodeGrid = ConstructGrid(pegSize);
+
+            //Draws the pegs/baskets from grid
+            InitialPeg(ballSize, app);
+            DrawPegs(nodeGrid, app, pegSize);
+
+            if(showNeighbors)
+            {
+                //Show neighbor of each peg
+                ShowNeighbors(nodeGrid, app);
+            }
+
+            //Create path for nodes:
+            var predeterminedPath = Pathfinding(nodeGrid);
+
+            //Draws the ball on screen
+            var ball;
+            var hasGameStarted;
+
+            //Index of the node where the ball is currently at
+            var currentNodeIndex;
+
+            //Update loop
+            app.ticker.add((ticker) => {
+
+                if(hasGameStarted)
+                {
+                    //Moves ball from peg to peg
+                    //deltaTime is the time elapsed from previous frame to current frame
+                    BallMovement(ticker.deltaTime);
+
+                    if(currentNodeIndex >= predeterminedPath.length)
+                    {
+                        app.stage.removeChild(ball);
+
+                        hasGameStarted = false;
+
+                        balance = UpdateBalance(balance, predeterminedPath[predeterminedPath.length - 1].win, false);
+                        UpdateBalanceUI(balance);
+                    }
+                }
+            });
+
+            //Draws the play button for placing a bet
+            var playButton = PlayButton(app);
+            //Registers a play button click event
+            playButton.on('pointerdown', (event) => { 
+                PlaceBet(); 
+            });
+            playButton.eventMode = 'static';
+
+            //Play background music on button click
+            InitializeAudio(musicSrc);
+            PlayMusic(app, musicVolume);
+
+            InitializeBettingUI(app, balance);
+
+            function BallMovement(deltaTime) {
+                var differenceInPositionX = predeterminedPath[currentNodeIndex].x - ball.x;
+                var differenceInPositionY = predeterminedPath[currentNodeIndex].y - ball.y;
+
+                ball.position.x += (deltaTime * differenceInPositionX * 0.06);
+                ball.position.y += (deltaTime * differenceInPositionY * 0.06);
+
+                if (differenceInPositionX < 10 && differenceInPositionY < 10) {
+                    currentNodeIndex++;
+                }
+            }
+
+            //Called when Play button for bet is clicked
+            function PlaceBet() {
+                if (!hasGameStarted && balance >= debitAmount) {
+                    balance = UpdateBalance(balance, debitAmount, true);
+                    UpdateBalanceUI(balance);
+                    hasGameStarted = true;
+                    ball = DrawBall(ballSize, app);
+                    currentNodeIndex = 0;
+                    predeterminedPath = Pathfinding(nodeGrid);
+                    predeterminedPath = predeterminedPath.reverse();
+
+                    if (debugPathConstruction) {
+                        //Show path that the ball will take
+                        ShowPathConstruction(predeterminedPath, app);
+                    }
+                }
+            }
+
+        </script>
+    </body>
+
+</html>
